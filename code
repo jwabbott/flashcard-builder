@@ -31,7 +31,6 @@ INFO_FONT_PT = 9
 
 
 # Read student information into a dataframe and verify size and columns
-
 df = pd.read_csv('sample_student_info.csv')
 print (df.head())
 print(df.columns)
@@ -46,16 +45,18 @@ image_folder_location = Path("C:/Users/jwabbott/Desktop/CAS-502/flashcards/test_
 
 # Create an index of the headshot image files
 def build_image_index(image_folder):
+
 	"""
 	Goes through a specified folder and creates an index dictionary of the filenames (key: filename, value: full path).
 	"""
+
 	image_dict = {}
 
 	# Iterate through all items in the image folder directory, and create the full path for each file
 	for file_name in os.listdir(image_folder):
 		full_path = os.path.join(image_folder, file_name)
 
-		# if the item is a file (not a folder), add its filename to the dictionary
+		# if the item is a file (i.e. not a folder), add its filename to the dictionary
 		if os.path.isfile(full_path):
 			image_dict[file_name] = full_path
 
@@ -80,41 +81,72 @@ df["image_path"] = df["image_filename"].map(image_dict)
 cell_value = df.at[0, 'image_path']
 print(cell_value)
 
-image = df.at[0, 'image_filename']
 
-with Image.open(cell_value) as img:
-	#img = ImageOps.exif_transpose(img)
-	img_size_tuple = img.size
-	img_width_px, img_height_px = img_size_tuple
-	dpi_val = img.info.get('dpi')
-	if dpi_val:
-		dpi = dpi_val[0]
-	else:
-		dpi = 72
-	img_height = img_height_px / dpi
-	img_width = img_width_px / dpi
+def format_image (image):
 
-	scale_h = IMG_MAX_HEIGHT / img_height
-	scale_w = IMG_MAX_WIDTH / img_width
-	scale = min(scale_w, scale_h, 1.0)
+	"""
+	opens and formats the given image to prepare it for insertion into Word document
+	then stores formatting details in a dictionary that can be added to corresponding row in the main dataframe
+	"""
+
+	image_formatting_info = {}
+	image_formatting_info['image_path'] = image
+
+	with Image.open(image) as img:
+		img_size_tuple = img.size
+		img_width_px, img_height_px = img_size_tuple
+		image_formatting_info['width_px'] = img_width_px
+		image_formatting_info['height_px'] = img_height_px
+
+		dpi_val = img.info.get('dpi')
+		if dpi_val:
+			dpi = dpi_val[0]
+		else:
+			dpi = 72
+		image_formatting_info['dpi'] = dpi
+
+		img_height = img_height_px / dpi
+		img_width = img_width_px / dpi
+		image_formatting_info['height_in'] = img_height
+		image_formatting_info['width_in'] = img_width
+
+		scale_h = IMG_MAX_HEIGHT / img_height
+		scale_w = IMG_MAX_WIDTH / img_width
+		scale = min(scale_w, scale_h, 1.0)
+		image_formatting_info['scale'] = scale
 	
-	scaled_height = img_height * scale
-	scaled_width = img_width * scale
+		scaled_height = img_height * scale
+		scaled_width = img_width * scale
+		image_formatting_info['scaled_height_in'] = scaled_height
+		image_formatting_info['scaled_width_in'] = scaled_width
 
-	scaled_height_px = int(img_height_px * scale)
-	scaled_width_px = int(img_width_px * scale)
+		scaled_height_px = int(img_height_px * scale)
+		scaled_width_px = int(img_width_px * scale)
+		image_formatting_info['scaled_height_px'] = scaled_height_px
+		image_formatting_info['scaled_width_px'] = scaled_width_px
 
-	print("Filename: ", image)
-	print("Image height in pixels: ", img_height_px)
-	print("Image width in pixels: ", img_width_px)
-	print("Dots per inch: ", dpi)
-	print(f"Image height in inches: {img_height:.2f}")
-	print(f"Image width in inches: {img_width:.2f}")
-	print(f"Scale factor: {scale:.2f}")
-	print(f"Final image height and width for printing (in inches): {scaled_height:.2f} in. x {scaled_width:.2f} in.")
-	print(f"Final image height and width for printing (in pixels): {scaled_height_px} px. x {scaled_width_px} px.")
+	return image_formatting_info
 
 
-	img.show()
+# Define column names for and create an empty new dataframe that will contain image formatting data
 
+image_formatting_columns = ['image_path', 'height_px', 'width_px', 'height_in', 'width_in', 'scale', 'scaled_height_in', 'scaled_width_in', 'scaled_height_px', 'scaled_width_px']
+
+image_info_df = pd.DataFrame(columns=image_formatting_columns)
+
+
+# Populate the new dataframe with image formatting data for each image
+
+for row in range(len(df)):
+	image_to_format = df.at[row, 'image_path']
+	image_info_df.loc[row] = format_image(image_to_format)
+
+
+# Merge the new image formatting dataframe with the student information dataframe so that all information needed to inserting into Word is contained in a single dataframe
+# Verify size and columns
+
+df = pd.merge(df, image_info_df, on='image_path')
+
+print (df.head())
+print(df.columns)
 
