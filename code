@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
 # # Flashcard Builder
 # ## Joshua W. Abbott
 # ### Description:
@@ -10,324 +7,114 @@
 
 # ## Install tools
 
-# In[28]:
-
-
-# Import necessary tools
-
-from pathlib import Path
-import argparse
-import math
-import re
-import sys
-import logging
-from typing import Optional
-
 import pandas as pd
-from PIL import Image, ExifTags, ImageOps
-from docx import Document
-from docx.shared import Inches, Pt
-from docx.enum.table import WD_ROW_HEIGHT_RULE
-from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
-from docx.enum.table import WD_ALIGN_VERTICAL
+import numpy as np
+from pathlib import Path
+from PIL import Image
+import os
 
-
-# ## Define information labels and values
-
-# In[29]:
-
-
-# Define information labels and values
-
-COLUMNS = 2
-ROWS = 5
-CARDS_PER_PAGE = COLUMNS * ROWS
-CARD_WIDTH_IN = 8.5 / COLUMNS
-CARD_HEIGHT_IN = 11.0 / ROWS
-IMG_MAX_WIDTH_IN = CARD_WIDTH_IN * 0.9
-IMG_MAX_HEIGHT_IN = CARD_HEIGHT_IN * 0.9
+# Set values for page and card size, orientation, and margins (all measurements in inches unless otherwise indicated)
+PAGE_HEIGHT = 8.5
+PAGE_WIDTH = 11
+PAGE_MARGINS = 0.25
+ROWS = 2
+COLUMNS = 5
+CARDS_PER_PAGE = ROWS * COLUMNS
+TABLE_HEIGHT = PAGE_HEIGHT - 2 * PAGE_MARGINS
+TABLE_WIDTH = PAGE_WIDTH - 2 * PAGE_MARGINS
+CARD_HEIGHT = TABLE_HEIGHT / ROWS
+CARD_WIDTH = TABLE_WIDTH / COLUMNS
+IMG_MAX_HEIGHT = CARD_HEIGHT * 0.9
+IMG_MAX_WIDTH = CARD_WIDTH * 0.9
 NAME_FONT_PT = 14
 INFO_FONT_PT = 9
-DEFAULT_MARGIN_IN = 0.5
 
 
-# In[30]:
+# Read student information into a dataframe and verify size and columns
+
+df = pd.read_csv('sample_student_info.csv')
+print (df.head())
+print(df.columns)
+print("Number of students: ", len(df))
+
+
+# Replace any missing values with an empty string to avoid "NaN" errors
+df.fillna('', inplace=True)
+
+# Specify the path to the folder containing the headshot images
+image_folder_location = Path("C:/Users/jwabbott/Desktop/CAS-502/flashcards/test_headshots")
+
+# Create an index of the headshot image files
+def build_image_index(image_folder):
+	"""
+	Goes through a specified folder and creates an index dictionary of the filenames (key: filename, value: full path).
+	"""
+	image_dict = {}
+
+	# Iterate through all items in the image folder directory, and create the full path for each file
+	for file_name in os.listdir(image_folder):
+		full_path = os.path.join(image_folder, file_name)
+
+		# if the item is a file (not a folder), add its filename to the dictionary
+		if os.path.isfile(full_path):
+			image_dict[file_name] = full_path
+
+	# Count and display how many headshot images were found and indexed; display first few image filenames
+	num_headshots = len(image_dict)
+	print("Number of headshot images found: ", num_headshots)
+	first_five_keys = list(image_dict.keys())[:5]
+	print("Sampling of image filenames: ", first_five_keys)
+
+	# Verify that the number of student entries and the number of headshot images match and print a warning if they don't
+	if not (len(df) == num_headshots):
+		print("Warning: number of students and number of headshot images do not match.")
+	            
+	return image_dict
+
+image_dict = build_image_index(image_folder_location)
+
+# Add a column to the dataframe containing the filepaths of the image files for each student
+df["image_path"] = df["image_filename"].map(image_dict)
+
+# Check whether the correct path has been added to the dataframe for at least the first row
+cell_value = df.at[0, 'image_path']
+print(cell_value)
+
+image = df.at[0, 'image_filename']
+
+with Image.open(cell_value) as img:
+	#img = ImageOps.exif_transpose(img)
+	img_size_tuple = img.size
+	img_width_px, img_height_px = img_size_tuple
+	dpi_val = img.info.get('dpi')
+	if dpi_val:
+		dpi = dpi_val[0]
+	else:
+		dpi = 72
+	img_height = img_height_px / dpi
+	img_width = img_width_px / dpi
+
+	scale_h = IMG_MAX_HEIGHT / img_height
+	scale_w = IMG_MAX_WIDTH / img_width
+	scale = min(scale_w, scale_h, 1.0)
+	
+	scaled_height = img_height * scale
+	scaled_width = img_width * scale
+
+	scaled_height_px = int(img_height_px * scale)
+	scaled_width_px = int(img_width_px * scale)
+
+	print("Filename: ", image)
+	print("Image height in pixels: ", img_height_px)
+	print("Image width in pixels: ", img_width_px)
+	print("Dots per inch: ", dpi)
+	print(f"Image height in inches: {img_height:.2f}")
+	print(f"Image width in inches: {img_width:.2f}")
+	print(f"Scale factor: {scale:.2f}")
+	print(f"Final image height and width for printing (in inches): {scaled_height:.2f} in. x {scaled_width:.2f} in.")
+	print(f"Final image height and width for printing (in pixels): {scaled_height_px} px. x {scaled_width_px} px.")
+
+
+	img.show()
 
-
-logger = logging.getLogger("flashcards")
-
-
-# ## Functions
-
-# ### Normalize filenames and Create image index
-
-# In[36]:
-
-
-def normalize_filename(s: str) -> str:
-    if s is None:
-        return ""
-    s = str(s).lower().strip()
-    s = re.sub(r'\s+', '_', s)
-    s = re.sub(r'[^a-z0-9_]', '', s)
-    return s
-
-
-def build_image_index(image_folder: Path):
-    mapping = {}
-    for p in image_folder.iterdir():
-        if p.is_file():
-            stem = normalize_filename(p.stem)
-            mapping[stem] = p
-    return mapping
-
-
-def exif_orient_image(img: Image.Image) -> Image.Image:
-    # Handle common EXIF orientation tags, return rotated image
-    try:
-        exif = img._getexif()
-    except Exception:
-        exif = None
-    if not exif:
-        return img
-    orientation_key = None
-    for k, v in ExifTags.TAGS.items():
-        if v == 'Orientation':
-            orientation_key = k
-            break
-    if orientation_key is None:
-        return img
-    orientation = exif.get(orientation_key, None)
-    if orientation == 3:
-        return img.rotate(180, expand=True)
-    if orientation == 6:
-        return img.rotate(270, expand=True)
-    if orientation == 8:
-        return img.rotate(90, expand=True)
-    return img
-
-
-# ### Find the correct image file
-
-# In[33]:
-
-
-def find_image (row, image_index, image_folder):
-    if "image_filename" in row and row["image_filename"]:
-        candidate = image_folder / str(row["image_filename"])
-        if candidate.exists():
-            return candidate
-
-def compute_image_inches(img_path: Path):
-    with Image.open(img_path) as im:
-        im = exif_orient_image(im)
-        w_px, h_px = im.size
-        dpi = im.info.get('dpi', (72, 72))[0]
-        if not dpi or dpi <= 0:
-            dpi = 72
-        w_in = w_px / dpi
-        h_in = h_px / dpi
-        return w_in, h_in
-
-
-# ### Add table of student info to the front of the page
-
-# In[37]:
-
-
-def add_front_table_for_batch(doc: Document, batch_df: pd.DataFrame, display_columns):
-    table = doc.add_table(rows=ROWS, cols=COLUMNS)
-    table.autofit = False
-
-    for col in table.columns:
-        for cell in col.cells:
-            cell.width = Inches(CARD_WIDTH_IN)
-
-    idx = 0
-    for r in range(ROWS):
-        row = table.rows[r]
-        row.height = Inches(CARD_HEIGHT_IN)
-        row.height_rule = WD_ROW_HEIGHT_RULE.EXACTLY
-        for c in range(COLUMNS):
-            cell = row.cells[c]
-            cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-            para = cell.paragraphs[0]
-            para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-
-            if idx < len(batch_df):
-                data = batch_df.iloc[idx]
-                name_text = str(data.get("name", "")).strip()
-                run = para.add_run(name_text + "\n")
-                run.bold = True
-                run.font.size = Pt(NAME_FONT_PT)
-
-                for colname in display_columns:
-                    if colname == "name":
-                        continue
-                    val = data.get(colname, "")
-                    if pd.notna(val) and str(val).strip() != "":
-                        p = cell.add_paragraph(f"{colname.replace('_',' ').title()}: {val}")
-                        p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-                        for rrun in p.runs:
-                            rrun.font.size = Pt(INFO_FONT_PT)
-            idx += 1
-    doc.add_page_break()
-
-
-# ### Add table of student headshot images to back of page
-
-# In[38]:
-
-
-def add_back_table_for_batch(doc: Document, batch_df: pd.DataFrame, image_index, image_folder: Path, placeholder: Optional[Path]):
-    table = doc.add_table(rows=ROWS, cols=COLUMNS)
-    table.autofit = False
-    for col in table.columns:
-        for cell in col.cells:
-            cell.width = Inches(CARD_WIDTH_IN)
-
-    idx = 0
-    for r in range(ROWS):
-        row = table.rows[r]
-        row.height = Inches(CARD_HEIGHT_IN)
-        row.height_rule = WD_ROW_HEIGHT_RULE.EXACTLY
-        for c in range(COLUMNS):
-            cell = row.cells[c]
-            cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-            para = cell.paragraphs[0]
-            para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-
-            if idx < len(batch_df):
-                data = batch_df.iloc[idx]
-                img_path = find_image(data, image_index, image_folder)
-                if img_path is None and placeholder:
-                    img_path = placeholder
-                if img_path is not None and img_path.exists():
-                    # determine scaled width in inches to fit cell
-                    try:
-                        w_in, h_in = compute_image_inches(img_path)
-                        scale_w = IMG_MAX_WIDTH_IN / w_in if w_in else 1.0
-                        scale_h = IMG_MAX_HEIGHT_IN / h_in if h_in else 1.0
-                        scale = min(scale_w, scale_h, 1.0)
-                        final_w_in = max(0.1, w_in * scale)
-                        run = para.add_run()
-                        run.add_picture(str(img_path), width=Inches(final_w_in))
-                    except Exception as ex:
-                        logger.warning("Failed to add image for %s: %s", data.get("name", ""), ex)
-                        para.add_run("[IMAGE ERROR]")
-                else:
-                    para.add_run("[NO IMAGE]")
-            idx += 1
-    doc.add_page_break()
-
-
-# ### Create document for holding flashcards
-
-# In[39]:
-
-
-def make_flashcard_doc(csv_path: Path, image_folder: Path, output_docx: Path,
-                       placeholder_image: Optional[Path], display_columns=None, margins_in=DEFAULT_MARGIN_IN):
-    if display_columns is None:
-        display_columns = ["name", "student_number", "hometown", "undergrad_school", "major", "fun_fact"]
-
-    df = pd.read_csv(csv_path, dtype=str).fillna("")
-    # Build name
-    df["first_name"] = df.get("first_name", "")
-    df["last_name"] = df.get("last_name", "")
-    df["name"] = (df["first_name"].str.strip() + " " + df["last_name"].str.strip()).str.strip()
-
-    for c in display_columns:
-        if c not in df.columns:
-            df[c] = ""
-
-    image_index = build_image_index(image_folder)
-
-    doc = Document()
-    # set margins
-    for sec in doc.sections:
-        sec.top_margin = Inches(margins_in)
-        sec.bottom_margin = Inches(margins_in)
-        sec.left_margin = Inches(margins_in)
-        sec.right_margin = Inches(margins_in)
-
-    total = len(df)
-    pages = math.ceil(total / CARDS_PER_PAGE)
-    logger.info("Total records: %d -> pages: %d (cards per page: %d)", total, pages, CARDS_PER_PAGE)
-
-    for pnum in range(pages):
-        start = pnum * CARDS_PER_PAGE
-        end = start + CARDS_PER_PAGE
-        batch_df = df.iloc[start:end].reset_index(drop=True)
-        add_front_table_for_batch(doc, batch_df, display_columns)
-        add_back_table_for_batch(doc, batch_df, image_index, image_folder, placeholder_image)
-
-    doc.save(output_docx)
-    logger.info("Saved: %s (cards: %d, pages(front+back pairs): %d)", output_docx, total, pages)
-
-
-# In[40]:
-
-
-def parse_args():
-    p = argparse.ArgumentParser(description="Generate flashcards Word doc (custom CSV schema).")
-    p.add_argument("csv", help="CSV file path (must include required headers)")
-    p.add_argument("images", help="Folder with headshot images")
-    p.add_argument("output", help="Output .docx filename")
-    p.add_argument("--placeholder-image", help="Path to placeholder image used when a student's image is missing", default=None)
-    p.add_argument("--margin", type=float, help="Page margin in inches (default 0.5)", default=DEFAULT_MARGIN_IN)
-    p.add_argument("--quiet", action="store_true", help="Reduce logging")
-    p.add_argument("--display-columns", nargs="+",
-                   help="Which columns to show on front (in order). Name 'name' is auto-created. Example: name student_number hometown",
-                   default=None)
-    p.add_argument("--dry-run", action="store_true", help="Do everything except save the output file (useful for testing matches)")
-    return p.parse_args()
-
-
-# ### Make flashcards
-
-# In[41]:
-
-
-def main():
-    args = parse_args()
-    logging.basicConfig(level=logging.INFO if not args.quiet else logging.WARNING,
-                        format="%(levelname)s: %(message)s")
-
-    csv_path = Path(args.csv)
-    image_folder = Path(args.images)
-    output_docx = Path(args.output)
-    placeholder = Path(args.placeholder_image) if args.placeholder_image else None
-
-    if not csv_path.exists():
-        logger.error("CSV not found: %s", csv_path)
-        sys.exit(2)
-    if not image_folder.exists() or not image_folder.is_dir():
-        logger.error("Image folder not found or not a directory: %s", image_folder)
-        sys.exit(2)
-    if placeholder and not placeholder.exists():
-        logger.error("Placeholder image not found: %s", placeholder)
-        sys.exit(2)
-
-    display_columns = args.display_columns
-    if display_columns is None:
-        display_columns = ["name", "student_number", "hometown", "undergrad_school", "major", "fun_fact"]
-
-    try:
-        if args.dry_run:
-            logger.info("Running in dry-run mode. No file will be written.")
-        make_flashcard_doc(csv_path, image_folder, output_docx if not args.dry_run else Path("DRY-RUN.docx"),
-                           placeholder_image=placeholder, display_columns=display_columns, margins_in=args.margin)
-    except Exception as e:
-        logger.exception("Fatal error while creating document: %s", e)
-        sys.exit(1)
-
-
-# ### Run Script
-
-# In[42]:
-
-
-if __name__ == "__main__":
-    main()
 
