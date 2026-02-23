@@ -29,6 +29,8 @@ The image files in the headshots folder should follow this naming convention: "i
 
 With the inputs above, the script will create a two-sided MS Word document containing flashcards for 10 students per page. The front contains the student name and information, and the back holds the students' photos. You can print the document, being sure to set the printer settings to front-and-back, and then cut out the cards. 
 
+# Helping with this project
 
+If you would like to help with this project by reporting bugs or suggesting new features, please contact me directly at josh.abbott@asu.edu. Thanks!
 
 
