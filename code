@@ -102,43 +102,42 @@ def format_image (image):
 	with Image.open(image) as img:
 		img_size_tuple = img.size
 		img_width_px, img_height_px = img_size_tuple
-		image_formatting_info['width_px'] = img_width_px
+		image_formatting_info['width_px'] = img_width_px			# add image dimensions in pixels to the dictionary
 		image_formatting_info['height_px'] = img_height_px
 
-		dpi_val = img.info.get('dpi')
-		if dpi_val:
+		dpi_val = img.info.get('dpi')								# get the "dots-per-inch" from the image info and add to dictionary
+		if dpi_val:													# use 72 as the default dpi if not contained in image info
 			dpi = dpi_val[0]
 		else:
 			dpi = 72
 		image_formatting_info['dpi'] = dpi
 
-		img_height = img_height_px / dpi
+		img_height = img_height_px / dpi							# calculate the image dimensions in inches
 		img_width = img_width_px / dpi
 		image_formatting_info['height_in'] = img_height
 		image_formatting_info['width_in'] = img_width
 
-		scale_h = IMG_MAX_HEIGHT / img_height
+		scale_h = IMG_MAX_HEIGHT / img_height						# calculate the scaling factor to fit the image in the table cell
 		scale_w = IMG_MAX_WIDTH / img_width
 		scale = min(scale_w, scale_h, 1.0)
 		image_formatting_info['scale'] = scale
 	
-		scaled_height = img_height * scale
+		scaled_height = img_height * scale							# calculate scaled image dimensions in inches
 		scaled_width = img_width * scale
 		image_formatting_info['scaled_height_in'] = scaled_height
 		image_formatting_info['scaled_width_in'] = scaled_width
 
-		scaled_height_px = int(img_height_px * scale)
+		scaled_height_px = int(img_height_px * scale)				# calculate scaled image dimensions in pixels
 		scaled_width_px = int(img_width_px * scale)
 		image_formatting_info['scaled_height_px'] = scaled_height_px
 		image_formatting_info['scaled_width_px'] = scaled_width_px
 
-	return image_formatting_info
+	return image_formatting_info									# return dictionary with all image info
 
 
 # Define column names for and create an empty new dataframe that will contain image formatting data
 
 image_formatting_columns = ['image_path', 'height_px', 'width_px', 'height_in', 'width_in', 'scale', 'scaled_height_in', 'scaled_width_in', 'scaled_height_px', 'scaled_width_px']
-
 image_info_df = pd.DataFrame(columns=image_formatting_columns)
 
 
@@ -179,10 +178,10 @@ section.right_margin = Inches(0.25)
 def add_front(document, batch_df):
 
 	"""
-	Adds front table with student info for batch to Word document.
+	Adds front table with student info for current batch to Word document.
 	"""
 
-	table = document.add_table(rows=2, cols=5)
+	table = document.add_table(rows=2, cols=5)					# insert table with fixed row and column sizes
 	table.style = 'Table Grid' 
 	table.allow_autofit = False
 
@@ -198,10 +197,10 @@ def add_front(document, batch_df):
 
 	student_index = 0
 
-	for row in table.rows:
+	for row in table.rows:										# iterate through each cell in the table
 		for cell in row.cells:
 
-			if student_index < len(batch_df):
+			if student_index < len(batch_df):					# only add info to cell is there are more students in the batch
 
 				# Center text, set to 14-point font size, enter student name
 
@@ -221,6 +220,9 @@ def add_front(document, batch_df):
 				new_para_format = new_para.paragraph_format
 				new_para_format.left_indent = Inches(0.25)
 
+
+				# iterate through student info and add to card
+
 				for i in range(3):
 					line = i + 1
 					line_text = batch_df.iat[student_index, line]
@@ -229,7 +231,7 @@ def add_front(document, batch_df):
 					run.font.size = Pt(11)
 
 
-			student_index = student_index + 1
+			student_index = student_index + 1						# iterate to next student in the batch
 
 
 def add_back(document, batch_df):
@@ -238,7 +240,7 @@ def add_back(document, batch_df):
 	Adds back table with student photos to Word document.
 	"""
 
-	table = document.add_table(rows=2, cols=5)
+	table = document.add_table(rows=2, cols=5)						# insert table with fixed row and column sizes
 	table.style = 'Table Grid' 
 	table.allow_autofit = False
 
@@ -255,10 +257,10 @@ def add_back(document, batch_df):
 	student_index = 0
 
 
-	for row in table.rows:
-		for cell in reversed(row.cells):
+	for row in table.rows:											# iterate through each cell in the table, 
+		for cell in reversed(row.cells):							# but in such a way as to pair each photo on the back to the matching student info on the front
 
-			if student_index < len(batch_df):
+			if student_index < len(batch_df):						# only add photos if there are more in the batch, up to 10
 
 				para = cell.add_paragraph()
 				para.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -270,23 +272,23 @@ def add_back(document, batch_df):
 				run.add_picture(photo_path, width=Inches(photo_width))
 				cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
 
-			student_index = student_index + 1
+			student_index = student_index + 1						# iterate to the next studdent in the batch
 
 
-num_of_batches = math.ceil(len(df) / 10)
+num_of_batches = math.ceil(len(df) / 10)							# calculate the number of batches of 10 students each, with last batch containing any remaining
 
-for batch_index in range(num_of_batches):
+for batch_index in range(num_of_batches):							# iterate through each batch of students
 
 	start = batch_index * 10
 	end = start + 10
 	end = min(end, len(df))
 
-	batch_df = df.iloc[start:end].reset_index(drop=True)
+	batch_df = df.iloc[start:end].reset_index(drop=True)			# create a new dataframe containing only the info for the students in the current batch
 
-	add_front(document, batch_df)
+	add_front(document, batch_df)									# insert student info and photos into Word document by calling the functions to add front and back
 
 	add_back(document, batch_df)
 
 	
 	
-document.save('flashcards.docx')
+document.save('flashcards.docx')									# save the Word document
