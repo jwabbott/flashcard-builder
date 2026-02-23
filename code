@@ -9,9 +9,16 @@
 
 import pandas as pd
 import numpy as np
+import math
 from pathlib import Path
 from PIL import Image
 import os
+from docx import Document
+from docx.enum.section import WD_ORIENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_ALIGN_VERTICAL
+from docx.shared import Inches, Cm, Pt
+from docx.enum.table import WD_ROW_HEIGHT_RULE
 
 # Set values for page and card size, orientation, and margins (all measurements in inches unless otherwise indicated)
 PAGE_HEIGHT = 8.5
@@ -20,8 +27,8 @@ PAGE_MARGINS = 0.25
 ROWS = 2
 COLUMNS = 5
 CARDS_PER_PAGE = ROWS * COLUMNS
-TABLE_HEIGHT = PAGE_HEIGHT - 2 * PAGE_MARGINS
-TABLE_WIDTH = PAGE_WIDTH - 2 * PAGE_MARGINS
+TABLE_HEIGHT = 0.9 * PAGE_HEIGHT
+TABLE_WIDTH = PAGE_WIDTH
 CARD_HEIGHT = TABLE_HEIGHT / ROWS
 CARD_WIDTH = TABLE_WIDTH / COLUMNS
 IMG_MAX_HEIGHT = CARD_HEIGHT * 0.9
@@ -43,7 +50,7 @@ df.fillna('', inplace=True)
 # Specify the path to the folder containing the headshot images
 image_folder_location = Path("C:/Users/jwabbott/Desktop/CAS-502/flashcards/test_headshots")
 
-# Create an index of the headshot image files
+
 def build_image_index(image_folder):
 
 	"""
@@ -150,3 +157,136 @@ df = pd.merge(df, image_info_df, on='image_path')
 print (df.head())
 print(df.columns)
 
+
+# Create a new blank Word document
+document = Document()
+
+
+# set document's orientation to landscape
+section = document.sections[-1] 
+new_width, new_height = section.page_height, section.page_width
+section.page_width = new_width
+section.page_height = new_height
+
+# set document's margins to a quarter inch
+section.top_margin = Inches(0.25)
+section.bottom_margin = Inches(0.25)
+section.left_margin = Inches(0.25)
+section.right_margin = Inches(0.25)
+
+
+
+def add_front(document, batch_df):
+
+	"""
+	Adds front table with student info for batch to Word document.
+	"""
+
+	table = document.add_table(rows=2, cols=5)
+	table.style = 'Table Grid' 
+	table.allow_autofit = False
+
+	for column in table.columns:
+		column.width = Inches(CARD_WIDTH)
+		for cell in column.cells:
+			cell.width = Inches(CARD_WIDTH)
+
+	for row in table.rows:
+		row.height = Inches(CARD_HEIGHT)
+		row.height_rule = WD_ROW_HEIGHT_RULE.EXACTLY
+											
+
+	student_index = 0
+
+	for row in table.rows:
+		for cell in row.cells:
+
+			if student_index < len(batch_df):
+
+				# Center text, set to 14-point font size, enter student name
+
+				para = cell.add_paragraph()
+				para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+	
+				name_text = batch_df.iat[student_index, 0]
+				run = para.add_run(name_text + "\n")
+				run.bold = True	
+				run.font.size = Pt(14)
+		
+
+				# Left justify text, reset to 11-pt font size, enter other student info
+		
+				new_para = cell.add_paragraph()
+				new_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+				new_para_format = new_para.paragraph_format
+				new_para_format.left_indent = Inches(0.25)
+
+				for i in range(3):
+					line = i + 1
+					line_text = batch_df.iat[student_index, line]
+					run = new_para.add_run(line_text + "\n")
+					run.bold = False	
+					run.font.size = Pt(11)
+
+
+			student_index = student_index + 1
+
+
+def add_back(document, batch_df):
+
+	"""
+	Adds back table with student photos to Word document.
+	"""
+
+	table = document.add_table(rows=2, cols=5)
+	table.style = 'Table Grid' 
+	table.allow_autofit = False
+
+	for column in table.columns:
+		column.width = Inches(CARD_WIDTH)
+		for cell in column.cells:
+			cell.width = Inches(CARD_WIDTH)
+
+	for row in table.rows:
+		row.height = Inches(CARD_HEIGHT)
+		row.height_rule = WD_ROW_HEIGHT_RULE.EXACTLY
+
+
+	student_index = 0
+
+
+	for row in table.rows:
+		for cell in reversed(row.cells):
+
+			if student_index < len(batch_df):
+
+				para = cell.add_paragraph()
+				para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+				run = para.add_run()
+
+				photo_path = batch_df.iat[student_index, 5]
+				photo_width = batch_df.iat[student_index, 12]
+
+				run.add_picture(photo_path, width=Inches(photo_width))
+				cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+
+			student_index = student_index + 1
+
+
+num_of_batches = math.ceil(len(df) / 10)
+
+for batch_index in range(num_of_batches):
+
+	start = batch_index * 10
+	end = start + 10
+	end = min(end, len(df))
+
+	batch_df = df.iloc[start:end].reset_index(drop=True)
+
+	add_front(document, batch_df)
+
+	add_back(document, batch_df)
+
+	
+	
+document.save('flashcards.docx')
