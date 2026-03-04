@@ -1,23 +1,39 @@
-# Istallation Instructions
+# Installation Instructions
 
-This code uses python version 3.13.9
+## Requirements
 
-## Required Imports
+Prerequisites:
+- Python 3.10+ (tested with Python 3.13.9)
+- Git (for cloning)
+- Anaconda (recommended) or standard Python
 
-You will need to install or import the following python dependencies in order to run this script:
+Required packages:
 - pandas
-- numpy
-- math
-- os
+- pillow
 - python-docx
+- numpy
 
-This code also uses the following resources:
-- from pathlib import Path
-- from PIL import Image
-- from docx import Document
-- from docx.enum.section import WD_ORIENT
-- from docx.enum.text import WD_ALIGN_PARAGRAPH
-- from docx.enum.table import WD_ALIGN_VERTICAL
-- from docx.shared import Inches, Cm, Pt
-- from docx.enum.table import WD_ROW_HEIGHT_RULE
+## Recommended Installation
 
+### 1. Download code and data
+
+a. Download flashcard_builder.py  
+b. (Optional) ownload sample CSV file and headshot images:  
+- sample_headshots
+- sample_student_info.csv
+
+### 1. Create and activate an environment (Conda - preferred)
+
+Example:  
+conda create -n flashcards_py python=3.11  
+conda activate flashcards_py
+
+### 2. Install required packages
+
+Example:  
+conda install -c conda-forge pandas pillow python-docx pytest
+
+### 3. Run the script
+
+Generate Word file - example:  
+python flashcard_builder.py('.\sample_student_info.csv', '.\sample_headshots', '.\sample_doc.docx')
