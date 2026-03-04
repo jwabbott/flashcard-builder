@@ -30,10 +30,10 @@ conda activate flashcards_py
 
 ### 2. Install required packages
 
-Example:  
-conda install -c conda-forge pandas pillow python-docx pytest  
+Examples:  
+pip install -r requirements.txt  
 OR  
-use the requirements.txt file in this repository
+conda install -c conda-forge pandas pillow python-docx pytest  
 
 ### 3. Run the script
 
