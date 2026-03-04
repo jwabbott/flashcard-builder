@@ -18,14 +18,18 @@ Once you have downloaded flashcard_builder.py and imported the required packages
 
 For example:
 
-**python flashcard_builder.py --csv students.csv --images headshots --out flashcards.docx**
+If you've saved flashcard_builder.py, sample_student_info.csv, and the sample_headshots folder (along with its contents) to a folder named, for example, "flashcards," and you've navigated to that directory, then your shell prompt may look something like this:  
+**PS C:\Users\ . . . \flashcards>**  
+
+Call the script and pass in the 3 parameters described below by entering the following (for example):  
+**python flashcard_builder.py('.\sample_student_info.csv', '.\sample_headshots', '.\sample_doc')**
 
 where:
-- "students.csv" is the path that specifies the .csv file that contains your student information,
-- "headshots" is the path that specifies the folder containing your headshot images, and
-- "flashcards.docx" is the path that specifies the Word doc you want to generate with your flashcards
+- "sample_student_info.csv" is the CSV file that contains your student information,
+- "sample_headshots" is the folder containing your headshot images, and
+- "sample_doc" is a filename for the Word doc you will generate for your flashcards
 
-You can use the sample_headshots and the sample_student_info.csv in this repository. Enter a filename such as "flashcards.docx"
+You can use the sample_headshots and the sample_student_info.csv in this repository. Enter a filename such as "flashcards_doc"
 
 ### Inputs
 
@@ -37,6 +41,8 @@ This script requires two inputs: (1) a CSV file with student information, and (2
 - undergrad_school
 - major
 - image_filename
+
+If you are using sample_student_info.csv, then the information is already saved in this format.
 
 (2) The image files in the headshots folder should follow this naming convention: "image001.jpeg", "image002.jpeg", etc., where image001.jpeg contains the headshot image of the student whose name and information are listed on the first row (after the column names) in the CSV file, image002.jpeg contains the headshot of the student on the next row, and so on.  
 
