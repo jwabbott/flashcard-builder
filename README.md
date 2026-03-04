@@ -1,6 +1,6 @@
 # Flashcard Builder
 
-A Python tool that generates printable double-sided flashcards from a student information CSV file and a folder of headshot images.
+A Python-based tool that generates printable flashcards from a student information CSV file and a folder of headshot images.
 
 **By Joshua W. Abbott**
 
@@ -25,17 +25,7 @@ where:
 - "headshots" is the path that specifies the folder containing your headshot images, and
 - "flashcards.docx" is the path that specifies the Word doc you want to generate with your flashcards
 
-Please feel free to use the sample_headshots and the sample_student_info.csv in this repository. You can download and save them in a file structure such as this:
-
-  flashcard-builder/
-  │
-  ├── flashcard_builder.py
-  ├── students.csv
-  └── headshots/
-    ├── image001.jpeg
-    ├── image002.jpeg
-    └── ...
-
+You can use the sample_headshots and the sample_student_info.csv in this repository. Enter a filename such as "flashcards.docx"
 
 ## Inputs
 
